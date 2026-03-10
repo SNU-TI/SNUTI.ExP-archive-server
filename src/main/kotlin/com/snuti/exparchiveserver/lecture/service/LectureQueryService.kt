@@ -15,50 +15,50 @@ import org.springframework.transaction.annotation.Transactional
 class LectureQueryService(
     private val lectureRepository: LectureRepository
 ) {
+
     @Transactional(readOnly = true)
-    fun list(pageable: Pageable): Page<LectureListItemResponse> =
-        lectureRepository.findAllByStatus(LectureStatus.PUBLISHED, pageable)
-            .map { lec ->
+    fun getLectures(pageable: Pageable): Page<LectureListItemResponse> {
+        return lectureRepository.findAllByStatus(LectureStatus.PUBLISHED, pageable)
+            .map { lecture ->
                 LectureListItemResponse(
-                    id = requireNotNull(lec.id),
-                    title = lec.title,
-                    lectureDate = lec.lectureDate,
-                    location = lec.location,
-                    lecturerName = lec.lecturerName,
-                    topic = lec.topic,
-                    lectureSummary = lec.lectureSummary
+                    id = lecture.id!!,
+                    title = lecture.title,
+                    lectureDate = lecture.lectureDate,
+                    location = lecture.location,
+                    lectureSummary = lecture.lectureSummary,
+                    lecturerName = lecture.lecturerName,
+                    topic = lecture.topic
                 )
             }
+    }
 
     @Transactional(readOnly = true)
-    fun detail(id: Long): LectureDetailResponse {
-        val lec = lectureRepository.findById(id)
+    fun getLectureDetail(id: Long): LectureDetailResponse {
+        val lecture = lectureRepository.findWithDetailsByIdAndStatus(id, LectureStatus.PUBLISHED)
             .orElseThrow { IllegalArgumentException("Lecture not found: $id") }
 
-        // 일반 유저는 published만 보이게(추후 admin은 별도)
-        if (lec.status != LectureStatus.PUBLISHED) {
-            throw IllegalArgumentException("Lecture not found: $id")
-        }
-
         return LectureDetailResponse(
-            id = requireNotNull(lec.id),
-            title = lec.title,
-            lectureDate = lec.lectureDate,
-            location = lec.location,
-            lectureSummary = lec.lectureSummary,
-            lecturerName = lec.lecturerName,
-            topic = lec.topic,
-            articles = lec.articles.map {
+            id = lecture.id!!,
+            title = lecture.title,
+            lectureDate = lecture.lectureDate,
+            location = lecture.location,
+            lectureSummary = lecture.lectureSummary,
+            lecturerName = lecture.lecturerName,
+            topic = lecture.topic,
+            status = lecture.status,
+            articles = lecture.articles.map {
                 ArticleResponse(
-                    id = requireNotNull(it.id),
+                    id = it.id!!,
+                    lectureId = it.lecture.id!!,
                     articleTitle = it.articleTitle,
                     author = it.author,
                     content = it.content
                 )
             },
-            videos = lec.videos.map {
+            videos = lecture.videos.map {
                 VideoResponse(
-                    id = requireNotNull(it.id),
+                    id = it.id!!,
+                    lectureId = it.lecture.id!!,
                     videoUrl = it.videoUrl,
                     caption = it.caption
                 )

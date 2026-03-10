@@ -12,18 +12,22 @@ class GlobalExceptionHandler {
 
     data class ErrorResponse(val message: String)
 
-    @ExceptionHandler(MethodArgumentNotValidException::class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    fun handleValidation(e: MethodArgumentNotValidException): ErrorResponse =
-        ErrorResponse(e.bindingResult.allErrors.firstOrNull()?.defaultMessage ?: "Validation error")
-
     @ExceptionHandler(IllegalArgumentException::class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    fun handleBadRequest(e: IllegalArgumentException): ErrorResponse =
-        ErrorResponse(e.message ?: "Bad request")
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    fun handleIllegalArgument(e: IllegalArgumentException): ErrorResponse {
+        return ErrorResponse(e.message ?: "Invalid request")
+    }
 
     @ExceptionHandler(BadCredentialsException::class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    fun handleAuth(e: BadCredentialsException): ErrorResponse =
-        ErrorResponse(e.message ?: "Unauthorized")
+    fun handleBadCredentials(e: BadCredentialsException): ErrorResponse {
+        return ErrorResponse(e.message ?: "Unauthorized")
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    fun handleValidation(e: MethodArgumentNotValidException): ErrorResponse {
+        val message = e.bindingResult.fieldErrors.firstOrNull()?.defaultMessage ?: "Validation error"
+        return ErrorResponse(message)
+    }
 }
