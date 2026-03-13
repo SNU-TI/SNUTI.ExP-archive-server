@@ -34,8 +34,12 @@ class LectureQueryService(
 
     @Transactional(readOnly = true)
     fun getLectureDetail(id: Long): LectureDetailResponse {
-        val lecture = lectureRepository.findWithDetailsByIdAndStatus(id, LectureStatus.PUBLISHED)
+        val lecture = lectureRepository.findById(id)
             .orElseThrow { IllegalArgumentException("Lecture not found: $id") }
+
+        if (lecture.status != LectureStatus.PUBLISHED) {
+            throw IllegalArgumentException("Lecture not found: $id")
+        }
 
         return LectureDetailResponse(
             id = lecture.id!!,

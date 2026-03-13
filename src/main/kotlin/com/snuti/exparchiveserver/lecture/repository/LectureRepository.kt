@@ -13,8 +13,5 @@ interface LectureRepository : JpaRepository<Lecture, Long> {
     fun findAllByStatus(status: LectureStatus, pageable: Pageable): Page<Lecture>
 
     @EntityGraph(attributePaths = ["articles", "videos"])
-    fun findWithDetailsByIdAndStatus(id: Long, status: LectureStatus): Optional<Lecture>
-
-    @EntityGraph(attributePaths = ["articles", "videos"])
-    fun findWithDetailsById(id: Long): Optional<Lecture>
+    override fun findById(id: Long): Optional<Lecture>
 }
