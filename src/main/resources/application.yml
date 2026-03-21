@@ -23,7 +23,7 @@ cloud:
   aws:
     region: ap-northeast-2
     s3:
-      bucket: your-bucket-name
+      bucket: snuti-exp-archive-images
 
 app:
   jwt:
@@ -31,4 +31,4 @@ app:
     issuer: lecture-archive
     access-token-exp-minutes: 60
   cdn:
-    base-url: https://your-bucket-name.s3.ap-northeast-2.amazonaws.com
+    base-url: https://snuti-exp-archive-images.s3.ap-northeast-2.amazonaws.com
