@@ -1,29 +1,35 @@
-package com.snuti.exparchiveserver.lecture
+package com.snuti.exparchiveserver
 
 
 import com.snuti.exparchiveserver.auth.jwt.JwtTokenProvider
 import com.snuti.exparchiveserver.lecture.entity.Article
+import com.snuti.exparchiveserver.lecture.entity.ArticleBlock
+import com.snuti.exparchiveserver.lecture.entity.ArticleBlockType
 import com.snuti.exparchiveserver.lecture.entity.Lecture
 import com.snuti.exparchiveserver.lecture.entity.LectureStatus
 import com.snuti.exparchiveserver.lecture.entity.Video
 import com.snuti.exparchiveserver.lecture.repository.ArticleRepository
 import com.snuti.exparchiveserver.lecture.repository.LectureRepository
 import com.snuti.exparchiveserver.lecture.repository.VideoRepository
+import com.snuti.exparchiveserver.support.TestImageStorageConfig
 import com.snuti.exparchiveserver.user.entity.Role
 import com.snuti.exparchiveserver.user.entity.User
 import com.snuti.exparchiveserver.user.repository.UserRepository
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.databind.ObjectMapper
@@ -32,6 +38,7 @@ import java.time.LocalDateTime
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+@Import(TestImageStorageConfig::class)
 class LectureIntegrationTest
 @Autowired
 constructor(
@@ -49,10 +56,10 @@ constructor(
     private lateinit var adminToken: String
 
     private var lectureId: Long = 0L
+    private var articleId: Long = 0L
 
     @BeforeEach
     fun setup() {
-        // FK 제약조건 때문에 자식 테이블부터 삭제
         videoRepository.deleteAll()
         articleRepository.deleteAll()
         lectureRepository.deleteAll()
@@ -85,14 +92,36 @@ constructor(
             createdBy = normalUser
         )
 
-        lecture.articles.add(
-            Article(
-                lecture = lecture,
-                articleTitle = "AI Seminar Summary",
-                author = "Student Writer",
-                content = "# Summary\nThis is markdown content."
-            )
+        val article = Article(
+            lecture = lecture,
+            articleTitle = "AI Seminar Summary",
+            author = "Student Writer"
         )
+
+        val textBlock1 = ArticleBlock(
+            article = article,
+            type = ArticleBlockType.TEXT,
+            orderIndex = 0,
+            textContent = "# Summary"
+        )
+
+        val imageBlock = ArticleBlock(
+            article = article,
+            type = ArticleBlockType.IMAGE,
+            orderIndex = 1,
+            imageKey = "test/article-images/sample.png",
+            originalFileName = "sample.png"
+        )
+
+        val textBlock2 = ArticleBlock(
+            article = article,
+            type = ArticleBlockType.TEXT,
+            orderIndex = 2,
+            textContent = "This is markdown content."
+        )
+
+        article.replaceBlocks(listOf(textBlock1, imageBlock, textBlock2))
+        lecture.articles.add(article)
 
         lecture.videos.add(
             Video(
@@ -102,20 +131,19 @@ constructor(
             )
         )
 
-        lectureId = lectureRepository.save(lecture).id!!
+        val savedLecture = lectureRepository.save(lecture)
+        lectureId = savedLecture.id!!
+        articleId = savedLecture.articles.first().id!!
 
         userToken = login("user@snu.ac.kr", "password1234")
         adminToken = login("admin@snu.ac.kr", "password1234")
 
-        // 토큰 role 검증
         assertEquals("USER", jwtTokenProvider.parseRole(userToken))
         assertEquals("ADMIN", jwtTokenProvider.parseRole(adminToken))
     }
 
     @Test
     fun `should retrieve lecture list`() {
-        // 로그인한 일반 사용자는 강연 목록을 조회할 수 있어야 한다.
-
         mvc.perform(
             get("/lectures")
                 .header("Authorization", "Bearer $userToken")
@@ -128,24 +156,32 @@ constructor(
 
     @Test
     fun `should retrieve lecture detail`() {
-        // 로그인한 일반 사용자는 특정 강연의 상세 정보를 조회할 수 있어야 한다.
+        assertTrue(lectureRepository.findById(lectureId).isPresent)
 
         mvc.perform(
             get("/lectures/$lectureId")
                 .header("Authorization", "Bearer $userToken")
                 .contentType(MediaType.APPLICATION_JSON)
         )
+            .andDo(print())
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(lectureId))
             .andExpect(jsonPath("$.title").value("AI Seminar"))
             .andExpect(jsonPath("$.articles[0].articleTitle").value("AI Seminar Summary"))
+            .andExpect(jsonPath("$.articles[0].author").value("Student Writer"))
+            .andExpect(jsonPath("$.articles[0].blocks[0].type").value("TEXT"))
+            .andExpect(jsonPath("$.articles[0].blocks[0].textContent").value("# Summary"))
+            .andExpect(jsonPath("$.articles[0].blocks[1].type").value("IMAGE"))
+            .andExpect(jsonPath("$.articles[0].blocks[1].imageUrl").exists())
+            .andExpect(jsonPath("$.articles[0].blocks[1].originalFileName").value("sample.png"))
+            .andExpect(jsonPath("$.articles[0].blocks[2].type").value("TEXT"))
+            .andExpect(jsonPath("$.articles[0].blocks[2].textContent").value("This is markdown content."))
             .andExpect(jsonPath("$.videos[0].videoUrl").value("https://example.com/video.mp4"))
+            .andExpect(jsonPath("$.videos[0].caption").value("Main Session Video"))
     }
 
     @Test
     fun `should create lecture as admin`() {
-        // ADMIN 사용자는 강연 생성 API를 호출할 수 있어야 한다.
-
         val request = mapOf(
             "title" to "Backend Seminar",
             "lectureDate" to "2026-03-01T14:00:00",
@@ -169,8 +205,6 @@ constructor(
 
     @Test
     fun `should forbid normal user from creating lecture`() {
-        // 일반 사용자는 관리자 강연 생성 API를 호출할 수 없어야 한다.
-
         val request = mapOf(
             "title" to "Unauthorized Seminar",
             "lectureDate" to "2026-03-01T14:00:00"
@@ -201,5 +235,27 @@ constructor(
             .andReturn()
 
         return mapper.readTree(result.response.contentAsString)["accessToken"].asText()
+    }
+
+    @Test
+    fun `should not retrieve unpublished lecture`() {
+        val draftLecture = lectureRepository.save(
+            Lecture(
+                title = "Draft Lecture",
+                lectureDate = LocalDateTime.now(),
+                location = "Test",
+                lectureSummary = "Test",
+                lecturerName = "Test",
+                topic = "Test",
+                status = LectureStatus.DRAFT,
+                createdBy = userRepository.findAll().first()
+            )
+        )
+
+        mvc.perform(
+            get("/lectures/${draftLecture.id}")
+                .header("Authorization", "Bearer $userToken")
+        )
+            .andExpect(status().is4xxClientError)
     }
 }

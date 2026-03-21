@@ -1,4 +1,4 @@
-package com.snuti.exparchiveserver.config
+package com.snuti.exparchiveserver.common.config
 
 import com.snuti.exparchiveserver.auth.jwt.JwtAuthFilter
 import org.springframework.context.annotation.Bean
