@@ -1,12 +1,19 @@
-package com.snuti.exparchiveserver.article
+package com.snuti.exparchiveserver
+
 
 import com.snuti.exparchiveserver.auth.jwt.JwtTokenProvider
+import com.snuti.exparchiveserver.lecture.dto.ArticleBlockRequest
+import com.snuti.exparchiveserver.lecture.dto.CreateArticleRequest
+import com.snuti.exparchiveserver.lecture.dto.UpdateArticleRequest
 import com.snuti.exparchiveserver.lecture.entity.Article
+import com.snuti.exparchiveserver.lecture.entity.ArticleBlock
+import com.snuti.exparchiveserver.lecture.entity.ArticleBlockType
 import com.snuti.exparchiveserver.lecture.entity.Lecture
 import com.snuti.exparchiveserver.lecture.entity.LectureStatus
 import com.snuti.exparchiveserver.lecture.repository.ArticleRepository
 import com.snuti.exparchiveserver.lecture.repository.LectureRepository
 import com.snuti.exparchiveserver.lecture.repository.VideoRepository
+import com.snuti.exparchiveserver.support.TestImageStorageConfig
 import com.snuti.exparchiveserver.user.entity.Role
 import com.snuti.exparchiveserver.user.entity.User
 import com.snuti.exparchiveserver.user.repository.UserRepository
@@ -16,11 +23,14 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -30,6 +40,7 @@ import java.time.LocalDateTime
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+@Import(TestImageStorageConfig::class)
 class ArticleIntegrationTest
 @Autowired
 constructor(
@@ -51,7 +62,6 @@ constructor(
 
     @BeforeEach
     fun setup() {
-        // FK 제약조건 때문에 자식 테이블부터 삭제
         videoRepository.deleteAll()
         articleRepository.deleteAll()
         lectureRepository.deleteAll()
@@ -88,76 +98,139 @@ constructor(
 
         lectureId = lecture.id!!
 
-        val article = articleRepository.save(
-            Article(
-                lecture = lecture,
-                articleTitle = "Initial Article",
-                author = "Student Writer",
-                content = "# Summary\nInitial markdown"
-            )
+        val article = Article(
+            lecture = lecture,
+            articleTitle = "Initial Article",
+            author = "Student Writer"
         )
 
-        articleId = article.id!!
+        val block1 = ArticleBlock(
+            article = article,
+            type = ArticleBlockType.TEXT,
+            orderIndex = 0,
+            textContent = "# Summary"
+        )
+
+        val block2 = ArticleBlock(
+            article = article,
+            type = ArticleBlockType.TEXT,
+            orderIndex = 1,
+            textContent = "Initial markdown"
+        )
+
+        article.replaceBlocks(listOf(block1, block2))
+
+        val savedArticle = articleRepository.save(article)
+        articleId = savedArticle.id!!
 
         userToken = login("user@snu.ac.kr", "password1234")
         adminToken = login("admin@snu.ac.kr", "password1234")
 
-        // 토큰 role 검증
         assertEquals("USER", jwtTokenProvider.parseRole(userToken))
         assertEquals("ADMIN", jwtTokenProvider.parseRole(adminToken))
     }
 
     @Test
     fun `should retrieve article`() {
-        // 로그인한 일반 사용자는 기사 단건을 조회할 수 있어야 한다.
-
         mvc.perform(
-            get("/articles/$articleId")
+            get("/api/articles/$articleId")
                 .header("Authorization", "Bearer $userToken")
                 .contentType(MediaType.APPLICATION_JSON)
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(articleId))
             .andExpect(jsonPath("$.articleTitle").value("Initial Article"))
-            .andExpect(jsonPath("$.content").value("# Summary\nInitial markdown"))
+            .andExpect(jsonPath("$.author").value("Student Writer"))
+            .andExpect(jsonPath("$.blocks[0].type").value("TEXT"))
+            .andExpect(jsonPath("$.blocks[0].textContent").value("# Summary"))
+            .andExpect(jsonPath("$.blocks[1].type").value("TEXT"))
+            .andExpect(jsonPath("$.blocks[1].textContent").value("Initial markdown"))
     }
 
     @Test
     fun `should create article under lecture`() {
-        // ADMIN 사용자는 특정 강연에 article을 추가할 수 있어야 한다.
+        val request = CreateArticleRequest(
+            articleTitle = "Seminar Summary",
+            author = "Admin Writer",
+            blocks = listOf(
+                ArticleBlockRequest(
+                    type = ArticleBlockType.TEXT,
+                    orderIndex = 0,
+                    textContent = "# Summary"
+                ),
+                ArticleBlockRequest(
+                    type = ArticleBlockType.IMAGE,
+                    orderIndex = 1,
+                    clientImageKey = "img-1"
+                ),
+                ArticleBlockRequest(
+                    type = ArticleBlockType.TEXT,
+                    orderIndex = 2,
+                    textContent = "Seminar 내용"
+                )
+            )
+        )
 
-        val request = mapOf(
-            "articleTitle" to "Seminar Summary",
-            "author" to "Admin Writer",
-            "content" to "# Summary\nSeminar 내용"
+        val requestPart = MockMultipartFile(
+            "request",
+            "",
+            MediaType.APPLICATION_JSON_VALUE,
+            mapper.writeValueAsBytes(request)
+        )
+
+        val imagePart = MockMultipartFile(
+            "img-1",
+            "sample.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "fake-image-content".toByteArray()
         )
 
         mvc.perform(
-            post("/admin/lectures/$lectureId/articles")
+            multipart("/admin/lectures/$lectureId/articles")
+                .file(requestPart)
+                .file(imagePart)
                 .header("Authorization", "Bearer $adminToken")
-                .content(mapper.writeValueAsString(request))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.lectureId").value(lectureId))
             .andExpect(jsonPath("$.articleTitle").value("Seminar Summary"))
+            .andExpect(jsonPath("$.author").value("Admin Writer"))
+            .andExpect(jsonPath("$.blocks[0].type").value("TEXT"))
+            .andExpect(jsonPath("$.blocks[0].textContent").value("# Summary"))
+            .andExpect(jsonPath("$.blocks[1].type").value("IMAGE"))
+            .andExpect(jsonPath("$.blocks[1].imageUrl").exists())
+            .andExpect(jsonPath("$.blocks[1].originalFileName").value("sample.png"))
+            .andExpect(jsonPath("$.blocks[2].type").value("TEXT"))
+            .andExpect(jsonPath("$.blocks[2].textContent").value("Seminar 내용"))
     }
 
     @Test
     fun `should forbid normal user from creating article under lecture`() {
-        // 일반 사용자는 관리자 article 생성 API를 호출할 수 없어야 한다.
+        val request = CreateArticleRequest(
+            articleTitle = "Forbidden Article",
+            author = "User Writer",
+            blocks = listOf(
+                ArticleBlockRequest(
+                    type = ArticleBlockType.TEXT,
+                    orderIndex = 0,
+                    textContent = "# Denied"
+                )
+            )
+        )
 
-        val request = mapOf(
-            "articleTitle" to "Forbidden Article",
-            "author" to "User Writer",
-            "content" to "# Denied\nNo permission"
+        val requestPart = MockMultipartFile(
+            "request",
+            "",
+            MediaType.APPLICATION_JSON_VALUE,
+            mapper.writeValueAsBytes(request)
         )
 
         mvc.perform(
-            post("/admin/lectures/$lectureId/articles")
+            multipart("/admin/lectures/$lectureId/articles")
+                .file(requestPart)
                 .header("Authorization", "Bearer $userToken")
-                .content(mapper.writeValueAsString(request))
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
         )
             .andExpect(status().isForbidden)
     }
@@ -178,5 +251,83 @@ constructor(
             .andReturn()
 
         return mapper.readTree(result.response.contentAsString)["accessToken"].asText()
+    }
+
+    @Test
+    fun `should update article`() {
+        val request = UpdateArticleRequest(
+            articleTitle = "Updated Title",
+            author = "Updated Author",
+            blocks = listOf(
+                ArticleBlockRequest(
+                    type = ArticleBlockType.TEXT,
+                    orderIndex = 0,
+                    textContent = "수정된 내용"
+                )
+            )
+        )
+
+        val requestPart = MockMultipartFile(
+            "request",
+            "",
+            MediaType.APPLICATION_JSON_VALUE,
+            mapper.writeValueAsBytes(request)
+        )
+
+        mvc.perform(
+            multipart("/admin/articles/$articleId")
+                .file(requestPart)
+                .with { it.method = "PUT"; it }
+                .header("Authorization", "Bearer $adminToken")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.articleTitle").value("Updated Title"))
+            .andExpect(jsonPath("$.blocks[0].textContent").value("수정된 내용"))
+    }
+
+    @Test
+    fun `should delete article`() {
+        mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/admin/articles/$articleId")
+                .header("Authorization", "Bearer $adminToken")
+        )
+            .andExpect(status().isNoContent)
+
+        mvc.perform(
+            get("/api/articles/$articleId")
+                .header("Authorization", "Bearer $userToken")
+        )
+            .andExpect(status().is4xxClientError)
+    }
+
+    @Test
+    fun `should fail when TEXT block has no content`() {
+        val request = CreateArticleRequest(
+            articleTitle = "Invalid Article",
+            author = "Test",
+            blocks = listOf(
+                ArticleBlockRequest(
+                    type = ArticleBlockType.TEXT,
+                    orderIndex = 0,
+                    textContent = null
+                )
+            )
+        )
+
+        val requestPart = MockMultipartFile(
+            "request",
+            "",
+            MediaType.APPLICATION_JSON_VALUE,
+            mapper.writeValueAsBytes(request)
+        )
+
+        mvc.perform(
+            multipart("/admin/lectures/$lectureId/articles")
+                .file(requestPart)
+                .header("Authorization", "Bearer $adminToken")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+        )
+            .andExpect(status().is4xxClientError)
     }
 }

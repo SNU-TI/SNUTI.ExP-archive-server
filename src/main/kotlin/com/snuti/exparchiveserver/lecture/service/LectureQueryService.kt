@@ -1,6 +1,7 @@
 package com.snuti.exparchiveserver.lecture.service
 
-import com.snuti.exparchiveserver.lecture.dto.ArticleResponse
+import com.snuti.exparchiveserver.common.storage.ImageStorageService
+import com.snuti.exparchiveserver.lecture.dto.ArticleMapper
 import com.snuti.exparchiveserver.lecture.dto.LectureDetailResponse
 import com.snuti.exparchiveserver.lecture.dto.LectureListItemResponse
 import com.snuti.exparchiveserver.lecture.dto.VideoResponse
@@ -13,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class LectureQueryService(
-    private val lectureRepository: LectureRepository
+    private val lectureRepository: LectureRepository,
+    private val imageStorageService: ImageStorageService
 ) {
 
     @Transactional(readOnly = true)
@@ -50,23 +52,20 @@ class LectureQueryService(
             lecturerName = lecture.lecturerName,
             topic = lecture.topic,
             status = lecture.status,
-            articles = lecture.articles.map {
-                ArticleResponse(
-                    id = it.id!!,
-                    lectureId = it.lecture.id!!,
-                    articleTitle = it.articleTitle,
-                    author = it.author,
-                    content = it.content
-                )
-            },
-            videos = lecture.videos.map {
-                VideoResponse(
-                    id = it.id!!,
-                    lectureId = it.lecture.id!!,
-                    videoUrl = it.videoUrl,
-                    caption = it.caption
-                )
-            }
+            articles = lecture.articles
+                .sortedBy { it.createdAt }
+                .map { article -> ArticleMapper.toResponse(article, imageStorageService) },
+            videos = lecture.videos
+                .sortedBy { it.createdAt }
+                .map { video ->
+                    VideoResponse(
+                        id = video.id!!,
+                        lectureId = video.lecture.id!!,
+                        videoUrl = video.videoUrl,
+                        caption = video.caption,
+                        createdAt = video.createdAt
+                    )
+                }
         )
     }
 }

@@ -1,4 +1,4 @@
-package com.snuti.exparchiveserver.auth
+package com.snuti.exparchiveserver
 
 
 import com.snuti.exparchiveserver.lecture.repository.ArticleRepository
