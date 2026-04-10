@@ -133,7 +133,7 @@ constructor(
     @Test
     fun `should retrieve article`() {
         mvc.perform(
-            get("/api/articles/$articleId")
+            get("/articles/$articleId")
                 .header("Authorization", "Bearer $userToken")
                 .contentType(MediaType.APPLICATION_JSON)
         )
@@ -295,7 +295,7 @@ constructor(
             .andExpect(status().isNoContent)
 
         mvc.perform(
-            get("/api/articles/$articleId")
+            get("/admin/articles/$articleId")
                 .header("Authorization", "Bearer $userToken")
         )
             .andExpect(status().is4xxClientError)

@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/lecture_archive?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul}
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:password}
+    url: ${DB_URL='jdbc:mysql://lecture-archive-db.c1o480q8wvhq.ap-northeast-2.rds.amazonaws.com:3306/lecture_archive?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul'}
+    username: ${DB_USER:admin}
+    password: ${DB_PASSWORD:TrailAdmin123!}
   jpa:
     hibernate:
       ddl-auto: validate
