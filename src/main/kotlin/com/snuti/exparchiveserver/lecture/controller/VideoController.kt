@@ -12,25 +12,7 @@ import org.springframework.web.bind.annotation.*
 class VideoController(
     private val videoService: VideoService
 ) {
-
-    @PostMapping("/api/lectures/{lectureId}/videos")
-    fun createVideo(
-        @PathVariable lectureId: Long,
-        @RequestBody request: CreateVideoRequest
-    ): ResponseEntity<VideoResponse> {
-        val response = videoService.createVideo(lectureId, request)
-        return ResponseEntity.status(HttpStatus.CREATED).body(response)
-    }
-
-    @GetMapping("/api/lectures/{lectureId}/videos")
-    fun getVideosByLecture(
-        @PathVariable lectureId: Long
-    ): ResponseEntity<List<VideoResponse>> {
-        val response = videoService.getVideosByLecture(lectureId)
-        return ResponseEntity.ok(response)
-    }
-
-    @PutMapping("/api/videos/{videoId}")
+    @PutMapping("/admin/videos/{videoId}")
     fun updateVideo(
         @PathVariable videoId: Long,
         @RequestBody request: UpdateVideoRequest
@@ -39,7 +21,7 @@ class VideoController(
         return ResponseEntity.ok(response)
     }
 
-    @DeleteMapping("/api/videos/{videoId}")
+    @DeleteMapping("/admin/videos/{videoId}")
     fun deleteVideo(
         @PathVariable videoId: Long
     ): ResponseEntity<Void> {

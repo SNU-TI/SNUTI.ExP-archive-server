@@ -19,7 +19,7 @@ class ArticleController(
 ) {
 
     @Operation(summary = "아티클 단건 조회")
-    @GetMapping("/api/articles/{articleId}")
+    @GetMapping("/articles/{articleId}")
     fun getArticle(
         @PathVariable articleId: Long
     ): ResponseEntity<ArticleResponse> {
