@@ -46,6 +46,11 @@ data class VideoResponse(
     val createdAt: LocalDateTime
 )
 
+data class TagResponse(
+    val id: Long,
+    val name: String
+)
+
 data class LectureDetailResponse(
     val id: Long,
     val title: String,
@@ -56,7 +61,8 @@ data class LectureDetailResponse(
     val topic: String?,
     val status: LectureStatus,
     val articles: List<ArticleResponse>,
-    val videos: List<VideoResponse>
+    val videos: List<VideoResponse>,
+    val tags: List<TagResponse>
 )
 
 data class LectureCreateRequest(
@@ -70,7 +76,8 @@ data class LectureCreateRequest(
     val lectureSummary: String? = null,
     val lecturerName: String? = null,
     val topic: String? = null,
-    val status: LectureStatus = LectureStatus.PUBLISHED
+    val status: LectureStatus = LectureStatus.PUBLISHED,
+    val tags: List<String> = emptyList()
 )
 
 data class LectureCreateResponse(
@@ -81,7 +88,8 @@ data class LectureCreateResponse(
     val lectureSummary: String?,
     val lecturerName: String?,
     val topic: String?,
-    val status: LectureStatus
+    val status: LectureStatus,
+    val tags: List<TagResponse>,
 )
 
 data class CreateArticleRequest(
@@ -131,4 +139,8 @@ data class CreateVideoRequest(
 data class UpdateVideoRequest(
     val videoUrl: String,
     val caption: String? = null
+)
+
+data class TagCreateRequest(
+    val name: String
 )

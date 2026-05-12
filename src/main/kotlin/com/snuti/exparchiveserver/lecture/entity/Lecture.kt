@@ -57,6 +57,9 @@ class Lecture(
     @OneToMany(mappedBy = "lecture", cascade = [CascadeType.ALL], orphanRemoval = true)
     var videos: MutableList<Video> = mutableListOf()
 
+    @OneToMany(mappedBy = "lecture", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var lectureTags: MutableList<LectureTag> = mutableListOf()
+
     @Column(name = "created_at", nullable = false)
     var createdAt: LocalDateTime = LocalDateTime.now()
 

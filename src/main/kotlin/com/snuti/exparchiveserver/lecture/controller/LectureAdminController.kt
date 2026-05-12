@@ -6,15 +6,19 @@ import com.snuti.exparchiveserver.lecture.dto.CreateArticleRequest
 import com.snuti.exparchiveserver.lecture.dto.CreateVideoRequest
 import com.snuti.exparchiveserver.lecture.dto.LectureCreateRequest
 import com.snuti.exparchiveserver.lecture.dto.LectureCreateResponse
+import com.snuti.exparchiveserver.lecture.dto.TagCreateRequest
+import com.snuti.exparchiveserver.lecture.dto.TagResponse
 import com.snuti.exparchiveserver.lecture.dto.VideoResponse
 import com.snuti.exparchiveserver.lecture.service.ArticleService
 import com.snuti.exparchiveserver.lecture.service.LectureAdminService
+import com.snuti.exparchiveserver.lecture.service.TagService
 import com.snuti.exparchiveserver.lecture.service.VideoService
 import io.swagger.v3.oas.annotations.Operation
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.Authentication
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -32,6 +36,7 @@ class LectureAdminController(
     private val lectureAdminService: LectureAdminService,
     private val articleService: ArticleService,
     private val videoService: VideoService,
+    private val tagService: TagService,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -77,5 +82,20 @@ class LectureAdminController(
     ): Map<String, MultipartFile> {
         return multipartRequest.fileMap
             .filterKeys { it != "request" }
+    }
+
+    @Operation(summary = "태그 생성")
+    @PostMapping("/tags")
+    @ResponseStatus(HttpStatus.CREATED)
+    fun createTag(
+        @Valid @RequestBody request: TagCreateRequest
+    ): TagResponse {
+        return tagService.createTag(request)
+    }
+
+    @Operation(summary = "태그 목록 조회")
+    @GetMapping("/tags")
+    fun getTags(): List<TagResponse> {
+        return tagService.getTags()
     }
 }
