@@ -4,6 +4,7 @@ import com.snuti.exparchiveserver.common.storage.ImageStorageService
 import com.snuti.exparchiveserver.lecture.dto.ArticleMapper
 import com.snuti.exparchiveserver.lecture.dto.LectureDetailResponse
 import com.snuti.exparchiveserver.lecture.dto.LectureListItemResponse
+import com.snuti.exparchiveserver.lecture.dto.TagResponse
 import com.snuti.exparchiveserver.lecture.dto.VideoResponse
 import com.snuti.exparchiveserver.lecture.entity.LectureStatus
 import com.snuti.exparchiveserver.lecture.repository.LectureRepository
@@ -64,6 +65,14 @@ class LectureQueryService(
                         videoUrl = video.videoUrl,
                         caption = video.caption,
                         createdAt = video.createdAt
+                    )
+                },
+            tags = lecture.lectureTags
+                .sortedBy { it.createdAt }
+                .map { lectureTag ->
+                    TagResponse(
+                        id = lectureTag.tag.id!!,
+                        name = lectureTag.tag.name
                     )
                 }
         )

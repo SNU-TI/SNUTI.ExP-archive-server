@@ -1,15 +1,18 @@
 package com.snuti.exparchiveserver
 
-
 import com.snuti.exparchiveserver.auth.jwt.JwtTokenProvider
 import com.snuti.exparchiveserver.lecture.entity.Article
 import com.snuti.exparchiveserver.lecture.entity.ArticleBlock
 import com.snuti.exparchiveserver.lecture.entity.ArticleBlockType
 import com.snuti.exparchiveserver.lecture.entity.Lecture
 import com.snuti.exparchiveserver.lecture.entity.LectureStatus
+import com.snuti.exparchiveserver.lecture.entity.LectureTag
+import com.snuti.exparchiveserver.lecture.entity.Tag
 import com.snuti.exparchiveserver.lecture.entity.Video
 import com.snuti.exparchiveserver.lecture.repository.ArticleRepository
 import com.snuti.exparchiveserver.lecture.repository.LectureRepository
+import com.snuti.exparchiveserver.lecture.repository.LectureTagRepository
+import com.snuti.exparchiveserver.lecture.repository.TagRepository
 import com.snuti.exparchiveserver.lecture.repository.VideoRepository
 import com.snuti.exparchiveserver.support.TestImageStorageConfig
 import com.snuti.exparchiveserver.user.entity.Role
@@ -48,6 +51,8 @@ constructor(
     private val lectureRepository: LectureRepository,
     private val articleRepository: ArticleRepository,
     private val videoRepository: VideoRepository,
+    private val tagRepository: TagRepository,
+    private val lectureTagRepository: LectureTagRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
 ) {
@@ -60,9 +65,11 @@ constructor(
 
     @BeforeEach
     fun setup() {
+        lectureTagRepository.deleteAll()
         videoRepository.deleteAll()
         articleRepository.deleteAll()
         lectureRepository.deleteAll()
+        tagRepository.deleteAll()
         userRepository.deleteAll()
 
         val normalUser = userRepository.save(
@@ -135,6 +142,16 @@ constructor(
         lectureId = savedLecture.id!!
         articleId = savedLecture.articles.first().id!!
 
+        val aiTag = tagRepository.save(Tag(name = "AI"))
+        val llmTag = tagRepository.save(Tag(name = "LLM"))
+
+        lectureTagRepository.saveAll(
+            listOf(
+                LectureTag(savedLecture, aiTag),
+                LectureTag(savedLecture, llmTag)
+            )
+        )
+
         userToken = login("user@snu.ac.kr", "password1234")
         adminToken = login("admin@snu.ac.kr", "password1234")
 
@@ -167,6 +184,8 @@ constructor(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(lectureId))
             .andExpect(jsonPath("$.title").value("AI Seminar"))
+            .andExpect(jsonPath("$.tags[0].name").value("AI"))
+            .andExpect(jsonPath("$.tags[1].name").value("LLM"))
             .andExpect(jsonPath("$.articles[0].articleTitle").value("AI Seminar Summary"))
             .andExpect(jsonPath("$.articles[0].author").value("Student Writer"))
             .andExpect(jsonPath("$.articles[0].blocks[0].type").value("TEXT"))
@@ -189,7 +208,8 @@ constructor(
             "lectureSummary" to "Spring Boot Intro",
             "lecturerName" to "Professor Lee",
             "topic" to "Backend",
-            "status" to "PUBLISHED"
+            "status" to "PUBLISHED",
+            "tags" to emptyList<String>()
         )
 
         mvc.perform(
@@ -201,13 +221,78 @@ constructor(
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.title").value("Backend Seminar"))
             .andExpect(jsonPath("$.topic").value("Backend"))
+            .andExpect(jsonPath("$.tags").isArray)
+    }
+
+    @Test
+    fun `should create lecture with existing and new tags as admin`() {
+        tagRepository.save(Tag(name = "Backend"))
+
+        val request = mapOf(
+            "title" to "Spring Seminar",
+            "lectureDate" to "2026-03-01T14:00:00",
+            "location" to "Room 301",
+            "lectureSummary" to "Spring Boot Intro",
+            "lecturerName" to "Professor Lee",
+            "topic" to "Backend",
+            "status" to "PUBLISHED",
+            "tags" to listOf("Backend", "NewTag")
+        )
+
+        mvc.perform(
+            post("/admin/lectures")
+                .header("Authorization", "Bearer $adminToken")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.title").value("Spring Seminar"))
+            .andExpect(jsonPath("$.tags[0].name").value("Backend"))
+            .andExpect(jsonPath("$.tags[1].name").value("NewTag"))
+
+        assertTrue(tagRepository.existsByName("Backend"))
+        assertTrue(tagRepository.existsByName("NewTag"))
+    }
+
+    @Test
+    fun `should create tag as admin`() {
+        val request = mapOf(
+            "name" to "Backend"
+        )
+
+        mvc.perform(
+            post("/admin/tags")
+                .header("Authorization", "Bearer $adminToken")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.name").value("Backend"))
+
+        assertTrue(tagRepository.existsByName("Backend"))
+    }
+
+    @Test
+    fun `should retrieve tag list as admin`() {
+        tagRepository.save(Tag(name = "Backend"))
+        tagRepository.save(Tag(name = "Frontend"))
+
+        mvc.perform(
+            get("/admin/tags")
+                .header("Authorization", "Bearer $adminToken")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$").isArray)
+            .andExpect(jsonPath("$[0].name").exists())
     }
 
     @Test
     fun `should forbid normal user from creating lecture`() {
         val request = mapOf(
             "title" to "Unauthorized Seminar",
-            "lectureDate" to "2026-03-01T14:00:00"
+            "lectureDate" to "2026-03-01T14:00:00",
+            "tags" to emptyList<String>()
         )
 
         mvc.perform(
@@ -219,22 +304,19 @@ constructor(
             .andExpect(status().isForbidden)
     }
 
-    private fun login(email: String, password: String): String {
+    @Test
+    fun `should forbid normal user from creating tag`() {
         val request = mapOf(
-            "email" to email,
-            "password" to password
+            "name" to "UnauthorizedTag"
         )
 
-        val result = mvc.perform(
-            post("/auth/login")
+        mvc.perform(
+            post("/admin/tags")
+                .header("Authorization", "Bearer $userToken")
                 .content(mapper.writeValueAsString(request))
                 .contentType(MediaType.APPLICATION_JSON)
         )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.accessToken").exists())
-            .andReturn()
-
-        return mapper.readTree(result.response.contentAsString)["accessToken"].asText()
+            .andExpect(status().isForbidden)
     }
 
     @Test
@@ -257,5 +339,23 @@ constructor(
                 .header("Authorization", "Bearer $userToken")
         )
             .andExpect(status().is4xxClientError)
+    }
+
+    private fun login(email: String, password: String): String {
+        val request = mapOf(
+            "email" to email,
+            "password" to password
+        )
+
+        val result = mvc.perform(
+            post("/auth/login")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.accessToken").exists())
+            .andReturn()
+
+        return mapper.readTree(result.response.contentAsString)["accessToken"].asText()
     }
 }
