@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface LectureTagRepository : JpaRepository<LectureTag, Long> {
     fun findAllByLectureId(lectureId: Long): List<LectureTag>
+    fun deleteAllByLecture_Id(lectureId: Long)
 }
