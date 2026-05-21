@@ -37,6 +37,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.databind.ObjectMapper
 import java.time.LocalDateTime
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -357,5 +358,92 @@ constructor(
             .andReturn()
 
         return mapper.readTree(result.response.contentAsString)["accessToken"].asText()
+    }
+
+    @Test
+    fun `should retrieve draft lecture list as admin`() {
+        lectureRepository.save(
+            Lecture(
+                title = "Draft Lecture",
+                lectureDate = LocalDateTime.of(2026, 4, 1, 10, 0),
+                location = "Draft Room",
+                lectureSummary = "Draft Summary",
+                lecturerName = "Draft Lecturer",
+                topic = "Draft Topic",
+                status = LectureStatus.DRAFT,
+                createdBy = userRepository.findAll().first()
+            )
+        )
+
+        mvc.perform(
+            get("/admin/lectures/drafts")
+                .header("Authorization", "Bearer $adminToken")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.content[0].title").value("Draft Lecture"))
+            .andExpect(jsonPath("$.content[0].topic").value("Draft Topic"))
+    }
+
+    @Test
+    fun `should forbid normal user from retrieving draft lecture list`() {
+        mvc.perform(
+            get("/admin/lectures/drafts")
+                .header("Authorization", "Bearer $userToken")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `should update lecture as admin`() {
+        val request = mapOf(
+            "title" to "Updated AI Seminar",
+            "lectureDate" to "2026-05-01T15:00:00",
+            "location" to "Updated Hall",
+            "lectureSummary" to "Updated Summary",
+            "lecturerName" to "Prof. Updated",
+            "topic" to "Updated Topic",
+            "status" to "DRAFT",
+            "tags" to listOf("UpdatedTag", "AI")
+        )
+
+        mvc.perform(
+            patch("/admin/lectures/$lectureId")
+                .header("Authorization", "Bearer $adminToken")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.id").value(lectureId))
+            .andExpect(jsonPath("$.title").value("Updated AI Seminar"))
+            .andExpect(jsonPath("$.location").value("Updated Hall"))
+            .andExpect(jsonPath("$.lectureSummary").value("Updated Summary"))
+            .andExpect(jsonPath("$.lecturerName").value("Prof. Updated"))
+            .andExpect(jsonPath("$.topic").value("Updated Topic"))
+            .andExpect(jsonPath("$.status").value("DRAFT"))
+            .andExpect(jsonPath("$.tags[0].name").value("UpdatedTag"))
+            .andExpect(jsonPath("$.tags[1].name").value("AI"))
+
+        assertTrue(tagRepository.existsByName("UpdatedTag"))
+
+        val updatedLecture = lectureRepository.findById(lectureId).get()
+        assertEquals("Updated AI Seminar", updatedLecture.title)
+        assertEquals(LectureStatus.DRAFT, updatedLecture.status)
+    }
+
+    @Test
+    fun `should forbid normal user from updating lecture`() {
+        val request = mapOf(
+            "title" to "Hacked Title"
+        )
+
+        mvc.perform(
+            patch("/admin/lectures/$lectureId")
+                .header("Authorization", "Bearer $userToken")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isForbidden)
     }
 }

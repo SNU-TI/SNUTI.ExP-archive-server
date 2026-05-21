@@ -6,6 +6,8 @@ import com.snuti.exparchiveserver.lecture.dto.CreateArticleRequest
 import com.snuti.exparchiveserver.lecture.dto.CreateVideoRequest
 import com.snuti.exparchiveserver.lecture.dto.LectureCreateRequest
 import com.snuti.exparchiveserver.lecture.dto.LectureCreateResponse
+import com.snuti.exparchiveserver.lecture.dto.LectureListItemResponse
+import com.snuti.exparchiveserver.lecture.dto.LectureUpdateRequest
 import com.snuti.exparchiveserver.lecture.dto.TagCreateRequest
 import com.snuti.exparchiveserver.lecture.dto.TagResponse
 import com.snuti.exparchiveserver.lecture.dto.VideoResponse
@@ -15,10 +17,13 @@ import com.snuti.exparchiveserver.lecture.service.TagService
 import com.snuti.exparchiveserver.lecture.service.VideoService
 import io.swagger.v3.oas.annotations.Operation
 import jakarta.validation.Valid
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -82,6 +87,23 @@ class LectureAdminController(
     ): Map<String, MultipartFile> {
         return multipartRequest.fileMap
             .filterKeys { it != "request" }
+    }
+
+    @Operation(summary = "드래프트 강연 목록 조회")
+    @GetMapping("/lectures/drafts")
+    fun getDraftLectures(
+        pageable: Pageable
+    ): Page<LectureListItemResponse> {
+        return lectureAdminService.getDraftLectures(pageable)
+    }
+
+    @Operation(summary = "강연 수정")
+    @PatchMapping("/lectures/{lectureId}")
+    fun updateLecture(
+        @PathVariable lectureId: Long,
+        @Valid @RequestBody request: LectureUpdateRequest
+    ): LectureCreateResponse {
+        return lectureAdminService.updateLecture(lectureId, request)
     }
 
     @Operation(summary = "태그 생성")

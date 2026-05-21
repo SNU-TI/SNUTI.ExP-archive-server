@@ -92,6 +92,17 @@ data class LectureCreateResponse(
     val tags: List<TagResponse>,
 )
 
+data class LectureUpdateRequest(
+    val title: String?,
+    val lectureDate: LocalDateTime?,
+    val location: String?,
+    val lectureSummary: String?,
+    val lecturerName: String?,
+    val topic: String?,
+    val status: LectureStatus?,
+    val tags: List<String>?
+)
+
 data class CreateArticleRequest(
     @field:NotBlank
     val articleTitle: String,
