@@ -23,6 +23,14 @@ class LectureController(
         return lectureQueryService.getLectures(pageable)
     }
 
+    @GetMapping("/search")
+    fun searchLectures(
+        @RequestParam keyword: String,
+        pageable: Pageable
+    ): Page<LectureListItemResponse> {
+        return lectureQueryService.searchLectures(keyword, pageable)
+    }
+
     @Operation(summary = "강연 상세 조회")
     @GetMapping("/{id}")
     fun getLectureDetail(

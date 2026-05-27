@@ -36,6 +36,31 @@ class LectureQueryService(
     }
 
     @Transactional(readOnly = true)
+    fun searchLectures(
+        keyword: String,
+        pageable: Pageable
+    ): Page<LectureListItemResponse> {
+
+        return lectureRepository
+            .findByStatusAndTitleContaining(
+                LectureStatus.PUBLISHED,
+                keyword,
+                pageable
+            )
+            .map { lecture ->
+                LectureListItemResponse(
+                    id = lecture.id!!,
+                    title = lecture.title,
+                    lectureDate = lecture.lectureDate,
+                    location = lecture.location,
+                    lectureSummary = lecture.lectureSummary,
+                    lecturerName = lecture.lecturerName,
+                    topic = lecture.topic
+                )
+            }
+    }
+
+    @Transactional(readOnly = true)
     fun getLectureDetail(id: Long): LectureDetailResponse {
         val lecture = lectureRepository.findById(id)
             .orElseThrow { IllegalArgumentException("Lecture not found: $id") }

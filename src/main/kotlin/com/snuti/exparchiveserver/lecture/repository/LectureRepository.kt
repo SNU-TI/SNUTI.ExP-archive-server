@@ -9,4 +9,10 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface LectureRepository : JpaRepository<Lecture, Long> {
 
     fun findAllByStatus(status: LectureStatus, pageable: Pageable): Page<Lecture>
+
+    fun findByStatusAndTitleContaining(
+        status: LectureStatus,
+        keyword: String,
+        pageable: Pageable
+    ): Page<Lecture>
 }

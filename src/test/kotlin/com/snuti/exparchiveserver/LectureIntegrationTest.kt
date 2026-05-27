@@ -446,4 +446,72 @@ constructor(
         )
             .andExpect(status().isForbidden)
     }
+
+    @Test
+    fun `should search published lectures by Korean title keyword`() {
+        val user = userRepository.findAll().first()
+
+        lectureRepository.save(
+            Lecture(
+                title = "인공지능 특강",
+                lectureDate = LocalDateTime.of(2026, 6, 1, 10, 0),
+                location = "Room 101",
+                lectureSummary = "AI lecture",
+                lecturerName = "Prof. AI",
+                topic = "AI",
+                status = LectureStatus.PUBLISHED,
+                createdBy = user
+            )
+        )
+
+        lectureRepository.save(
+            Lecture(
+                title = "운영체제 세미나",
+                lectureDate = LocalDateTime.of(2026, 6, 2, 10, 0),
+                location = "Room 102",
+                lectureSummary = "OS lecture",
+                lecturerName = "Prof. OS",
+                topic = "OS",
+                status = LectureStatus.PUBLISHED,
+                createdBy = user
+            )
+        )
+
+        lectureRepository.save(
+            Lecture(
+                title = "인공지능 비공개 강의",
+                lectureDate = LocalDateTime.of(2026, 6, 3, 10, 0),
+                location = "Room 103",
+                lectureSummary = "Draft AI lecture",
+                lecturerName = "Prof. Draft",
+                topic = "AI",
+                status = LectureStatus.DRAFT,
+                createdBy = user
+            )
+        )
+
+        mvc.perform(
+            get("/lectures/search")
+                .header("Authorization", "Bearer $userToken")
+                .param("keyword", "인공지능")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].title").value("인공지능 특강"))
+            .andExpect(jsonPath("$.content[0].topic").value("AI"))
+    }
+
+    @Test
+    fun `should return empty page when no lecture matches keyword`() {
+        mvc.perform(
+            get("/lectures/search")
+                .header("Authorization", "Bearer $userToken")
+                .param("keyword", "양자컴퓨터")
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.content.length()").value(0))
+    }
 }
