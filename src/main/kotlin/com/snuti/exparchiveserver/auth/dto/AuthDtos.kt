@@ -22,6 +22,15 @@ data class LoginRequest(
     val password: String
 )
 
+data class ChangePasswordRequest(
+    @field:NotBlank
+    val currentPassword: String,
+
+    @field:NotBlank
+    @field:Size(min = 8, message = "비밀번호는 8자 이상이어야 합니다.")
+    val newPassword: String
+)
+
 data class AuthResponse(
     val accessToken: String
 )
