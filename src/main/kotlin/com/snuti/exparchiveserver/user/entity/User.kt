@@ -20,6 +20,9 @@ class User(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
 
+    @Column(name = "email_verified", nullable = false)
+    var emailVerified: Boolean = false
+
     @Column(name = "created_at", nullable = false)
     var createdAt: LocalDateTime = LocalDateTime.now()
 

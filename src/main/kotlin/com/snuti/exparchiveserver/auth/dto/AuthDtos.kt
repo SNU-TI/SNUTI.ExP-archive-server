@@ -31,6 +31,11 @@ data class ChangePasswordRequest(
     val newPassword: String
 )
 
+data class VerifyEmailCodeRequest(
+    @field:NotBlank
+    val code: String
+)
+
 data class AuthResponse(
     val accessToken: String
 )
