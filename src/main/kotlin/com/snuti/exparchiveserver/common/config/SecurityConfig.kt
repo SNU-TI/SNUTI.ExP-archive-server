@@ -35,6 +35,7 @@ class SecurityConfig(
                 it.requestMatchers("/admin/**").hasRole("ADMIN")
                 it.requestMatchers("/lectures/**").authenticated()
                 it.requestMatchers("/articles/**").authenticated()
+                it.requestMatchers("/users/**").authenticated()
                 it.anyRequest().permitAll()
             }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)

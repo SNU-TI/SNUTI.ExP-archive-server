@@ -15,7 +15,7 @@ class GlobalExceptionHandler {
     data class ErrorResponse(val message: String)
 
     @ExceptionHandler(IllegalArgumentException::class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun handleIllegalArgument(e: IllegalArgumentException): ErrorResponse {
         return ErrorResponse(e.message ?: "Invalid request")
     }

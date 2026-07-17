@@ -1,12 +1,14 @@
 package com.snuti.exparchiveserver.auth.service
 
 import com.snuti.exparchiveserver.auth.dto.AuthResponse
+import com.snuti.exparchiveserver.auth.dto.ChangePasswordRequest
 import com.snuti.exparchiveserver.auth.dto.LoginRequest
 import com.snuti.exparchiveserver.auth.dto.RegisterRequest
 import com.snuti.exparchiveserver.auth.jwt.JwtTokenProvider
 import com.snuti.exparchiveserver.user.entity.Role
 import com.snuti.exparchiveserver.user.entity.User
 import com.snuti.exparchiveserver.user.repository.UserRepository
+import jakarta.persistence.EntityNotFoundException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
@@ -54,5 +56,29 @@ class AuthService(
 
         val token = jwtTokenProvider.createAccessToken(auth, user.role.name)
         return AuthResponse(token)
+    }
+
+    fun changePassword(email: String, request: ChangePasswordRequest) {
+        val user = userRepository.findByEmail(email)
+            ?: throw IllegalArgumentException("사용자를 찾을 수 없습니다.")
+
+        if (!passwordEncoder.matches(request.currentPassword, user.passwordHash)) {
+            throw IllegalArgumentException("현재 비밀번호가 일치하지 않습니다.")
+        }
+
+        if (passwordEncoder.matches(request.newPassword, user.passwordHash)) {
+            throw IllegalArgumentException("새 비밀번호는 현재 비밀번호와 달라야 합니다.")
+        }
+
+        user.passwordHash = passwordEncoder.encode(request.newPassword).toString()
+    }
+
+    @Transactional
+    fun deleteAccount(email: String) {
+
+        val user = userRepository.findByEmail(email)
+            ?: throw EntityNotFoundException("사용자를 찾을 수 없습니다.")
+
+        userRepository.delete(user)
     }
 }
