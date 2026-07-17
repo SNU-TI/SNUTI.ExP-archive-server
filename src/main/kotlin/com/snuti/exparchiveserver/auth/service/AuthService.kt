@@ -8,6 +8,7 @@ import com.snuti.exparchiveserver.auth.jwt.JwtTokenProvider
 import com.snuti.exparchiveserver.user.entity.Role
 import com.snuti.exparchiveserver.user.entity.User
 import com.snuti.exparchiveserver.user.repository.UserRepository
+import jakarta.persistence.EntityNotFoundException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
@@ -70,5 +71,14 @@ class AuthService(
         }
 
         user.passwordHash = passwordEncoder.encode(request.newPassword).toString()
+    }
+
+    @Transactional
+    fun deleteAccount(email: String) {
+
+        val user = userRepository.findByEmail(email)
+            ?: throw EntityNotFoundException("사용자를 찾을 수 없습니다.")
+
+        userRepository.delete(user)
     }
 }

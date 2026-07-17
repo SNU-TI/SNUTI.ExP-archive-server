@@ -33,4 +33,12 @@ class AuthController(
         authService.changePassword(email, request)
         return ResponseEntity.noContent().build()
     }
+
+    @DeleteMapping("/me")
+    fun deleteAccount(
+        @AuthenticationPrincipal email: String
+    ): ResponseEntity<Void> {
+        authService.deleteAccount(email)
+        return ResponseEntity.noContent().build()
+    }
 }
