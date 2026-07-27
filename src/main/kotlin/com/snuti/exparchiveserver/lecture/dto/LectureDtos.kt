@@ -139,7 +139,9 @@ data class ArticleBlockRequest(
      * 예: "img-1", "img-2"
      * multipart 파일 part 이름도 동일하게 맞춘다.
      */
-    val clientImageKey: String? = null
+    val clientImageKey: String? = null,
+
+    val existingBlockId: Long? = null
 )
 
 data class CreateVideoRequest(
