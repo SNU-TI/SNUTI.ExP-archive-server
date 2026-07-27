@@ -254,7 +254,49 @@ constructor(
     }
 
     @Test
-    fun `should update article`() {
+    fun `should update article while retaining existing image and adding new image`() {
+        /*
+         * 기존 이미지가 포함된 Article을 준비한다.
+         */
+        val lecture = lectureRepository.findById(lectureId)
+            .orElseThrow()
+
+        val article = Article(
+            lecture = lecture,
+            articleTitle = "Article With Image",
+            author = "Original Author"
+        )
+
+        val textBlock = ArticleBlock(
+            article = article,
+            type = ArticleBlockType.TEXT,
+            orderIndex = 0,
+            textContent = "기존 내용"
+        )
+
+        val existingImageBlock = ArticleBlock(
+            article = article,
+            type = ArticleBlockType.IMAGE,
+            orderIndex = 1,
+            imageKey = "test-images/existing-image.png",
+            originalFileName = "existing-image.png"
+        )
+
+        article.replaceBlocks(
+            listOf(
+                textBlock,
+                existingImageBlock
+            )
+        )
+
+        val savedArticle = articleRepository.saveAndFlush(article)
+        val targetArticleId = savedArticle.id!!
+        val existingImageBlockId = existingImageBlock.id!!
+
+        /*
+         * 기존 이미지는 existingBlockId로 유지하고,
+         * 새 이미지는 clientImageKey로 추가한다.
+         */
         val request = UpdateArticleRequest(
             articleTitle = "Updated Title",
             author = "Updated Author",
@@ -263,6 +305,16 @@ constructor(
                     type = ArticleBlockType.TEXT,
                     orderIndex = 0,
                     textContent = "수정된 내용"
+                ),
+                ArticleBlockRequest(
+                    type = ArticleBlockType.IMAGE,
+                    orderIndex = 1,
+                    existingBlockId = existingImageBlockId
+                ),
+                ArticleBlockRequest(
+                    type = ArticleBlockType.IMAGE,
+                    orderIndex = 2,
+                    clientImageKey = "img-new"
                 )
             )
         )
@@ -274,16 +326,73 @@ constructor(
             mapper.writeValueAsBytes(request)
         )
 
+        val newImagePart = MockMultipartFile(
+            "img-new",
+            "new-image.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "new-fake-image-content".toByteArray()
+        )
+
         mvc.perform(
-            multipart("/admin/articles/$articleId")
+            multipart("/admin/articles/$targetArticleId")
                 .file(requestPart)
-                .with { it.method = "PUT"; it }
+                .file(newImagePart)
+                .with { requestBuilder ->
+                    requestBuilder.method = "PUT"
+                    requestBuilder
+                }
                 .header("Authorization", "Bearer $adminToken")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.articleTitle").value("Updated Title"))
+            .andExpect(jsonPath("$.author").value("Updated Author"))
+            .andExpect(jsonPath("$.blocks.length()").value(3))
+            .andExpect(jsonPath("$.blocks[0].type").value("TEXT"))
             .andExpect(jsonPath("$.blocks[0].textContent").value("수정된 내용"))
+            .andExpect(jsonPath("$.blocks[1].type").value("IMAGE"))
+            .andExpect(
+                jsonPath("$.blocks[1].originalFileName")
+                    .value("existing-image.png")
+            )
+            .andExpect(jsonPath("$.blocks[1].imageUrl").exists())
+            .andExpect(jsonPath("$.blocks[2].type").value("IMAGE"))
+            .andExpect(
+                jsonPath("$.blocks[2].originalFileName")
+                    .value("new-image.png")
+            )
+            .andExpect(jsonPath("$.blocks[2].imageUrl").exists())
+
+        /*
+         * DB에도 기존 이미지와 신규 이미지가 모두 남았는지 확인한다.
+         */
+        val updatedArticle = articleRepository
+            .findWithLectureAndBlocksById(targetArticleId)
+            .orElseThrow()
+
+        assertEquals("Updated Title", updatedArticle.articleTitle)
+        assertEquals("Updated Author", updatedArticle.author)
+        assertEquals(3, updatedArticle.blocks.size)
+
+        val imageBlocks = updatedArticle.blocks
+            .filter { it.type == ArticleBlockType.IMAGE }
+            .sortedBy { it.orderIndex }
+
+        assertEquals(2, imageBlocks.size)
+
+        assertEquals(
+            "test-images/existing-image.png",
+            imageBlocks[0].imageKey
+        )
+        assertEquals(
+            "existing-image.png",
+            imageBlocks[0].originalFileName
+        )
+
+        assertEquals(
+            "new-image.png",
+            imageBlocks[1].originalFileName
+        )
     }
 
     @Test
