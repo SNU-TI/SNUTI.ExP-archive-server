@@ -19,7 +19,10 @@ class EmailVerification(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var purpose: EmailVerificationPurpose
+    var purpose: EmailVerificationPurpose,
+
+    @Column(name = "verified", nullable = false)
+    var verified: Boolean = false
 
 ) {
 

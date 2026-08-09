@@ -9,7 +9,9 @@ import com.snuti.exparchiveserver.lecture.dto.VideoResponse
 import com.snuti.exparchiveserver.lecture.entity.LectureStatus
 import com.snuti.exparchiveserver.lecture.repository.LectureRepository
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -21,7 +23,20 @@ class LectureQueryService(
 
     @Transactional(readOnly = true)
     fun getLectures(pageable: Pageable): Page<LectureListItemResponse> {
-        return lectureRepository.findAllByStatus(LectureStatus.PUBLISHED, pageable)
+        val sortedPageable = PageRequest.of(
+            pageable.pageNumber,
+            pageable.pageSize,
+            Sort.by(
+                Sort.Order.desc("lectureDate"),
+                Sort.Order.desc("id")
+            )
+        )
+
+        return lectureRepository
+            .findAllByStatus(
+                LectureStatus.PUBLISHED,
+                sortedPageable
+            )
             .map { lecture ->
                 LectureListItemResponse(
                     id = lecture.id!!,
@@ -41,11 +56,20 @@ class LectureQueryService(
         pageable: Pageable
     ): Page<LectureListItemResponse> {
 
+        val sortedPageable = PageRequest.of(
+            pageable.pageNumber,
+            pageable.pageSize,
+            Sort.by(
+                Sort.Order.desc("lectureDate"),
+                Sort.Order.desc("id")
+            )
+        )
+
         return lectureRepository
             .findByStatusAndTitleContaining(
                 LectureStatus.PUBLISHED,
                 keyword,
-                pageable
+                sortedPageable
             )
             .map { lecture ->
                 LectureListItemResponse(

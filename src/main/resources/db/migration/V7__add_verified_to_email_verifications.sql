@@ -1,0 +1,2 @@
+ALTER TABLE email_verifications
+    ADD COLUMN verified BOOLEAN NOT NULL DEFAULT FALSE;

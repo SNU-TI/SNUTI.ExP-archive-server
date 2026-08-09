@@ -7,6 +7,7 @@ import com.snuti.exparchiveserver.lecture.repository.LectureRepository
 import com.snuti.exparchiveserver.lecture.repository.VideoRepository
 import com.snuti.exparchiveserver.user.repository.EmailVerificationRepository
 import com.snuti.exparchiveserver.user.repository.UserRepository
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -38,10 +39,6 @@ class AuthIntegrationTest @Autowired constructor(
     private val emailVerificationRepository: EmailVerificationRepository
 ) {
 
-    /*
-     * 테스트 중 실제 메일이 발송되지 않도록
-     * EmailService 빈을 Mockito mock으로 교체한다.
-     */
     @MockitoBean
     lateinit var emailService: EmailService
 
@@ -55,10 +52,15 @@ class AuthIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `should register successfully`() {
+    fun `should register successfully after email verification`() {
+        val email = "user1@snu.ac.kr"
+        val password = "password1234"
+
+        verifySignupEmail(email)
+
         val request = mapOf(
-            "email" to "user1@snu.ac.kr",
-            "password" to "password1234"
+            "email" to email,
+            "password" to password
         )
 
         mvc.perform(
@@ -68,12 +70,43 @@ class AuthIntegrationTest @Autowired constructor(
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.accessToken").exists())
+
+        val user = userRepository.findByEmail(email)
+        assertNotNull(user)
+        assertTrue(user!!.emailVerified)
+
+        val verification =
+            emailVerificationRepository.findByEmailAndPurpose(
+                email,
+                EmailVerificationPurpose.SIGN_UP
+            )
+
+        assertNull(verification)
+    }
+
+    @Test
+    fun `should return 400 when registering without email verification`() {
+        val request = mapOf(
+            "email" to "unverified@snu.ac.kr",
+            "password" to "password1234"
+        )
+
+        mvc.perform(
+            post("/auth/register")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isBadRequest)
     }
 
     @Test
     fun `should return 400 when password is too short`() {
+        val email = "user2@snu.ac.kr"
+
+        verifySignupEmail(email)
+
         val request = mapOf(
-            "email" to "user2@snu.ac.kr",
+            "email" to email,
             "password" to "123"
         )
 
@@ -87,14 +120,14 @@ class AuthIntegrationTest @Autowired constructor(
 
     @Test
     fun `should login successfully`() {
-        register(
-            email = "user3@snu.ac.kr",
-            password = "password1234"
-        )
+        val email = "user3@snu.ac.kr"
+        val password = "password1234"
+
+        register(email, password)
 
         val loginRequest = mapOf(
-            "email" to "user3@snu.ac.kr",
-            "password" to "password1234"
+            "email" to email,
+            "password" to password
         )
 
         mvc.perform(
@@ -108,13 +141,12 @@ class AuthIntegrationTest @Autowired constructor(
 
     @Test
     fun `should return 401 when password is incorrect`() {
-        register(
-            email = "user4@snu.ac.kr",
-            password = "password1234"
-        )
+        val email = "user4@snu.ac.kr"
+
+        register(email, "password1234")
 
         val loginRequest = mapOf(
-            "email" to "user4@snu.ac.kr",
+            "email" to email,
             "password" to "wrong-password"
         )
 
@@ -127,13 +159,17 @@ class AuthIntegrationTest @Autowired constructor(
     }
 
     @Test
-    fun `should send signup email verification code`() {
+    fun `should send signup email verification code without token`() {
         val email = "user5@snu.ac.kr"
-        val accessToken = register(email, "password1234")
+
+        val request = mapOf(
+            "email" to email
+        )
 
         mvc.perform(
             post("/auth/email/send")
-                .header("Authorization", "Bearer $accessToken")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
         )
             .andExpect(status().isNoContent)
 
@@ -146,18 +182,14 @@ class AuthIntegrationTest @Autowired constructor(
         assertNotNull(verification)
         assertTrue(verification!!.code.length == 6)
         assertTrue(verification.code.all { it.isDigit() })
+        assertFalse(verification.verified)
     }
 
     @Test
-    fun `should verify signup email code successfully`() {
+    fun `should verify signup email code successfully without token`() {
         val email = "user6@snu.ac.kr"
-        val accessToken = register(email, "password1234")
 
-        mvc.perform(
-            post("/auth/email/send")
-                .header("Authorization", "Bearer $accessToken")
-        )
-            .andExpect(status().isNoContent)
+        sendSignupEmailCode(email)
 
         val verification =
             emailVerificationRepository.findByEmailAndPurpose(
@@ -168,50 +200,56 @@ class AuthIntegrationTest @Autowired constructor(
             )
 
         val verifyRequest = mapOf(
+            "email" to email,
             "code" to verification.code
         )
 
         mvc.perform(
             post("/auth/email/verify")
-                .header("Authorization", "Bearer $accessToken")
                 .content(mapper.writeValueAsString(verifyRequest))
                 .contentType(MediaType.APPLICATION_JSON)
         )
             .andExpect(status().isNoContent)
 
-        val user = userRepository.findByEmail(email)
-            ?: throw IllegalStateException("사용자를 찾을 수 없습니다.")
+        val verified =
+            emailVerificationRepository.findByEmailAndPurpose(
+                email,
+                EmailVerificationPurpose.SIGN_UP
+            ) ?: throw IllegalStateException(
+                "회원가입 인증 정보가 없습니다."
+            )
 
-        assertTrue(user.emailVerified)
+        assertTrue(verified.verified)
     }
 
     @Test
     fun `should return 400 when signup verification code is wrong`() {
         val email = "user7@snu.ac.kr"
-        val accessToken = register(email, "password1234")
 
-        mvc.perform(
-            post("/auth/email/send")
-                .header("Authorization", "Bearer $accessToken")
-        )
-            .andExpect(status().isNoContent)
+        sendSignupEmailCode(email)
 
         val verifyRequest = mapOf(
+            "email" to email,
             "code" to "000000"
         )
 
         mvc.perform(
             post("/auth/email/verify")
-                .header("Authorization", "Bearer $accessToken")
                 .content(mapper.writeValueAsString(verifyRequest))
                 .contentType(MediaType.APPLICATION_JSON)
         )
             .andExpect(status().isBadRequest)
+
+        val verification =
+            emailVerificationRepository.findByEmailAndPurpose(
+                email,
+                EmailVerificationPurpose.SIGN_UP
+            )
+
+        assertNotNull(verification)
+        assertFalse(verification!!.verified)
     }
 
-    /*
-     * 비밀번호 재설정 인증번호 발송 테스트
-     */
     @Test
     fun `should send password reset verification code`() {
         val email = "reset1@snu.ac.kr"
@@ -240,9 +278,6 @@ class AuthIntegrationTest @Autowired constructor(
         assertTrue(verification.code.all { it.isDigit() })
     }
 
-    /*
-     * 비밀번호 재설정 인증번호 확인 테스트
-     */
     @Test
     fun `should verify password reset code successfully`() {
         val email = "reset2@snu.ac.kr"
@@ -271,9 +306,6 @@ class AuthIntegrationTest @Autowired constructor(
             .andExpect(status().isNoContent)
     }
 
-    /*
-     * 비밀번호 재설정 후 새로운 비밀번호로 로그인되는지 확인한다.
-     */
     @Test
     fun `should reset password successfully`() {
         val email = "reset3@snu.ac.kr"
@@ -304,9 +336,6 @@ class AuthIntegrationTest @Autowired constructor(
         )
             .andExpect(status().isNoContent)
 
-        /*
-         * 새 비밀번호로 로그인이 성공해야 한다.
-         */
         val newLoginRequest = mapOf(
             "email" to email,
             "password" to newPassword
@@ -320,9 +349,6 @@ class AuthIntegrationTest @Autowired constructor(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.accessToken").exists())
 
-        /*
-         * 사용한 인증번호는 삭제되어야 한다.
-         */
         val deletedVerification =
             emailVerificationRepository.findByEmailAndPurpose(
                 email,
@@ -353,9 +379,6 @@ class AuthIntegrationTest @Autowired constructor(
             .andExpect(status().isBadRequest)
     }
 
-    /*
-     * 회원탈퇴 테스트
-     */
     @Test
     fun `should delete logged in user account`() {
         val email = "delete1@snu.ac.kr"
@@ -372,9 +395,6 @@ class AuthIntegrationTest @Autowired constructor(
         assertNull(deletedUser)
     }
 
-    /*
-     * 회원탈퇴 후 기존 계정으로 로그인할 수 없어야 한다.
-     */
     @Test
     fun `should not login after account deletion`() {
         val email = "delete2@snu.ac.kr"
@@ -401,13 +421,67 @@ class AuthIntegrationTest @Autowired constructor(
     }
 
     /*
-     * 반복되는 회원가입 코드를 줄이기 위한 테스트 헬퍼.
-     * 회원가입 후 accessToken을 반환한다.
+     * 회원가입용 이메일 인증번호를 발송한다.
+     */
+    private fun sendSignupEmailCode(email: String) {
+        val request = mapOf(
+            "email" to email
+        )
+
+        mvc.perform(
+            post("/auth/email/send")
+                .content(mapper.writeValueAsString(request))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isNoContent)
+    }
+
+    /*
+     * 회원가입용 이메일 인증을 완료한다.
+     */
+    private fun verifySignupEmail(email: String) {
+        sendSignupEmailCode(email)
+
+        val verification =
+            emailVerificationRepository.findByEmailAndPurpose(
+                email,
+                EmailVerificationPurpose.SIGN_UP
+            ) ?: throw IllegalStateException(
+                "회원가입 인증번호가 저장되지 않았습니다."
+            )
+
+        val verifyRequest = mapOf(
+            "email" to email,
+            "code" to verification.code
+        )
+
+        mvc.perform(
+            post("/auth/email/verify")
+                .content(mapper.writeValueAsString(verifyRequest))
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isNoContent)
+
+        val verified =
+            emailVerificationRepository.findByEmailAndPurpose(
+                email,
+                EmailVerificationPurpose.SIGN_UP
+            ) ?: throw IllegalStateException(
+                "회원가입 인증 정보가 없습니다."
+            )
+
+        assertTrue(verified.verified)
+    }
+
+    /*
+     * 이메일 인증 완료 후 회원가입하고 accessToken을 반환한다.
      */
     private fun register(
         email: String,
         password: String
     ): String {
+        verifySignupEmail(email)
+
         val request = mapOf(
             "email" to email,
             "password" to password
