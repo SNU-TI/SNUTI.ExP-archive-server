@@ -1,10 +1,10 @@
 package com.snuti.exparchiveserver.auth.controller
 
+import com.snuti.exparchiveserver.auth.dto.SendEmailCodeRequest
 import com.snuti.exparchiveserver.auth.dto.VerifyEmailCodeRequest
 import com.snuti.exparchiveserver.auth.service.EmailVerificationService
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -15,20 +15,23 @@ import org.springframework.web.bind.annotation.RestController
 class EmailVerificationController(
     private val emailVerificationService: EmailVerificationService
 ) {
+
     @PostMapping("/send")
     fun sendCode(
-        @AuthenticationPrincipal email: String
+        @Valid @RequestBody request: SendEmailCodeRequest
     ): ResponseEntity<Void> {
-        emailVerificationService.sendCode(email)
+        emailVerificationService.sendCode(request.email)
         return ResponseEntity.noContent().build()
     }
 
     @PostMapping("/verify")
     fun verifyCode(
-        @AuthenticationPrincipal email: String,
         @Valid @RequestBody request: VerifyEmailCodeRequest
     ): ResponseEntity<Void> {
-        emailVerificationService.verifyCode(email, request.code)
+        emailVerificationService.verifyCode(
+            email = request.email,
+            code = request.code
+        )
         return ResponseEntity.noContent().build()
     }
 }

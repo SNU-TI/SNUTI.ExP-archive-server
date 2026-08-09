@@ -32,8 +32,22 @@ data class ChangePasswordRequest(
     val newPassword: String
 )
 
+data class SendEmailCodeRequest(
+    @field:NotBlank
+    @field:Email
+    val email: String
+)
+
 data class VerifyEmailCodeRequest(
     @field:NotBlank
+    @field:Email
+    val email: String,
+
+    @field:NotBlank
+    @field:Pattern(
+        regexp = "\\d{6}",
+        message = "인증번호는 6자리 숫자여야 합니다."
+    )
     val code: String
 )
 
