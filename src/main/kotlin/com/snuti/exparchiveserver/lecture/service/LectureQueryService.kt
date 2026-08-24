@@ -6,6 +6,7 @@ import com.snuti.exparchiveserver.lecture.dto.LectureDetailResponse
 import com.snuti.exparchiveserver.lecture.dto.LectureListItemResponse
 import com.snuti.exparchiveserver.lecture.dto.TagResponse
 import com.snuti.exparchiveserver.lecture.dto.VideoResponse
+import com.snuti.exparchiveserver.lecture.entity.Lecture
 import com.snuti.exparchiveserver.lecture.entity.LectureStatus
 import com.snuti.exparchiveserver.lecture.repository.LectureRepository
 import org.springframework.data.domain.Page
@@ -22,15 +23,11 @@ class LectureQueryService(
 ) {
 
     @Transactional(readOnly = true)
-    fun getLectures(pageable: Pageable): Page<LectureListItemResponse> {
-        val sortedPageable = PageRequest.of(
-            pageable.pageNumber,
-            pageable.pageSize,
-            Sort.by(
-                Sort.Order.desc("lectureDate"),
-                Sort.Order.desc("id")
-            )
-        )
+    fun getLectures(
+        pageable: Pageable
+    ): Page<LectureListItemResponse> {
+
+        val sortedPageable = createSortedPageable(pageable)
 
         return lectureRepository
             .findAllByStatus(
@@ -38,15 +35,7 @@ class LectureQueryService(
                 sortedPageable
             )
             .map { lecture ->
-                LectureListItemResponse(
-                    id = lecture.id!!,
-                    title = lecture.title,
-                    lectureDate = lecture.lectureDate,
-                    location = lecture.location,
-                    lectureSummary = lecture.lectureSummary,
-                    lecturerName = lecture.lecturerName,
-                    topic = lecture.topic
-                )
+                toListItemResponse(lecture)
             }
     }
 
@@ -56,14 +45,7 @@ class LectureQueryService(
         pageable: Pageable
     ): Page<LectureListItemResponse> {
 
-        val sortedPageable = PageRequest.of(
-            pageable.pageNumber,
-            pageable.pageSize,
-            Sort.by(
-                Sort.Order.desc("lectureDate"),
-                Sort.Order.desc("id")
-            )
-        )
+        val sortedPageable = createSortedPageable(pageable)
 
         return lectureRepository
             .findByStatusAndTitleContaining(
@@ -72,26 +54,21 @@ class LectureQueryService(
                 sortedPageable
             )
             .map { lecture ->
-                LectureListItemResponse(
-                    id = lecture.id!!,
-                    title = lecture.title,
-                    lectureDate = lecture.lectureDate,
-                    location = lecture.location,
-                    lectureSummary = lecture.lectureSummary,
-                    lecturerName = lecture.lecturerName,
-                    topic = lecture.topic
-                )
+                toListItemResponse(lecture)
             }
     }
 
     @Transactional(readOnly = true)
-    fun getLectureDetail(id: Long): LectureDetailResponse {
-        val lecture = lectureRepository.findById(id)
-            .orElseThrow { IllegalArgumentException("Lecture not found: $id") }
+    fun getLectureDetail(
+        id: Long
+    ): LectureDetailResponse {
 
-        if (lecture.status != LectureStatus.PUBLISHED) {
-            throw IllegalArgumentException("Lecture not found: $id")
-        }
+        val lecture = lectureRepository.findById(id)
+            .orElseThrow {
+                IllegalArgumentException(
+                    "Lecture not found: $id"
+                )
+            }
 
         return LectureDetailResponse(
             id = lecture.id!!,
@@ -102,9 +79,16 @@ class LectureQueryService(
             lecturerName = lecture.lecturerName,
             topic = lecture.topic,
             status = lecture.status,
+
             articles = lecture.articles
                 .sortedBy { it.createdAt }
-                .map { article -> ArticleMapper.toResponse(article, imageStorageService) },
+                .map { article ->
+                    ArticleMapper.toResponse(
+                        article,
+                        imageStorageService
+                    )
+                },
+
             videos = lecture.videos
                 .sortedBy { it.createdAt }
                 .map { video ->
@@ -116,14 +100,49 @@ class LectureQueryService(
                         createdAt = video.createdAt
                     )
                 },
-            tags = lecture.lectureTags
-                .sortedBy { it.createdAt }
-                .map { lectureTag ->
-                    TagResponse(
-                        id = lectureTag.tag.id!!,
-                        name = lectureTag.tag.name
-                    )
-                }
+
+            tags = toTagResponses(lecture)
         )
+    }
+
+    private fun createSortedPageable(
+        pageable: Pageable
+    ): Pageable {
+        return PageRequest.of(
+            pageable.pageNumber,
+            pageable.pageSize,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
+    }
+
+    private fun toListItemResponse(
+        lecture: Lecture
+    ): LectureListItemResponse {
+        return LectureListItemResponse(
+            id = lecture.id!!,
+            title = lecture.title,
+            lectureDate = lecture.lectureDate,
+            location = lecture.location,
+            lectureSummary = lecture.lectureSummary,
+            lecturerName = lecture.lecturerName,
+            topic = lecture.topic,
+            tags = toTagResponses(lecture)
+        )
+    }
+
+    private fun toTagResponses(
+        lecture: Lecture
+    ): List<TagResponse> {
+        return lecture.lectureTags
+            .sortedBy { it.createdAt }
+            .map { lectureTag ->
+                TagResponse(
+                    id = lectureTag.tag.id!!,
+                    name = lectureTag.tag.name
+                )
+            }
     }
 }
