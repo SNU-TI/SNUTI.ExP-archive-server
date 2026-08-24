@@ -22,23 +22,30 @@ class EmailVerificationService(
             throw IllegalArgumentException("이미 가입된 이메일입니다.")
         }
 
-        emailVerificationRepository.deleteByEmailAndPurpose(
-            email,
-            EmailVerificationPurpose.SIGN_UP
-        )
-
         val code = Random.nextInt(0, 1_000_000)
             .toString()
             .padStart(6, '0')
 
-        val verification = EmailVerification(
-            email = email,
-            code = code,
-            expiresAt = LocalDateTime.now().plusMinutes(5),
-            purpose = EmailVerificationPurpose.SIGN_UP
-        )
+        val existing =
+            emailVerificationRepository.findByEmailAndPurpose(
+                email,
+                EmailVerificationPurpose.SIGN_UP
+            )
 
-        emailVerificationRepository.save(verification)
+        if (existing != null) {
+            existing.code = code
+            existing.expiresAt = LocalDateTime.now().plusMinutes(5)
+            existing.verified = false
+        } else {
+            emailVerificationRepository.save(
+                EmailVerification(
+                    email = email,
+                    code = code,
+                    expiresAt = LocalDateTime.now().plusMinutes(5),
+                    purpose = EmailVerificationPurpose.SIGN_UP
+                )
+            )
+        }
 
         emailService.sendVerificationCode(
             to = email,

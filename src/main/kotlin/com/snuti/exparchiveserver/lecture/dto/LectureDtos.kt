@@ -16,7 +16,8 @@ data class LectureListItemResponse(
     val location: String?,
     val lecturerName: String?,
     val topic: String?,
-    val lectureSummary: String?
+    val lectureSummary: String?,
+    val tags: List<TagResponse>
 )
 
 data class ArticleResponse(
