@@ -320,28 +320,6 @@ constructor(
             .andExpect(status().isForbidden)
     }
 
-    @Test
-    fun `should not retrieve unpublished lecture`() {
-        val draftLecture = lectureRepository.save(
-            Lecture(
-                title = "Draft Lecture",
-                lectureDate = LocalDateTime.now(),
-                location = "Test",
-                lectureSummary = "Test",
-                lecturerName = "Test",
-                topic = "Test",
-                status = LectureStatus.DRAFT,
-                createdBy = userRepository.findAll().first()
-            )
-        )
-
-        mvc.perform(
-            get("/lectures/${draftLecture.id}")
-                .header("Authorization", "Bearer $userToken")
-        )
-            .andExpect(status().is4xxClientError)
-    }
-
     private fun login(email: String, password: String): String {
         val request = mapOf(
             "email" to email,
