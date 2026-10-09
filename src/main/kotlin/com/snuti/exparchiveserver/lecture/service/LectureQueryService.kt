@@ -15,11 +15,15 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.snuti.exparchiveserver.user.repository.UserInterestTagRepository
+import com.snuti.exparchiveserver.user.repository.UserRepository
 
 @Service
 class LectureQueryService(
     private val lectureRepository: LectureRepository,
-    private val imageStorageService: ImageStorageService
+    private val imageStorageService: ImageStorageService,
+    private val userRepository: UserRepository,
+    private val userInterestTagRepository: UserInterestTagRepository
 ) {
 
     @Transactional(readOnly = true)
@@ -33,6 +37,53 @@ class LectureQueryService(
             .findAllByStatus(
                 LectureStatus.PUBLISHED,
                 sortedPageable
+            )
+            .map { lecture ->
+                toListItemResponse(lecture)
+            }
+    }
+
+    @Transactional(readOnly = true)
+    fun getLecturesByTag(
+        tagId: Long,
+        pageable: Pageable
+    ): Page<LectureListItemResponse> {
+        val sortedPageable = createSortedPageable(pageable)
+
+        return lectureRepository
+            .findByStatusAndTagId(
+                status = LectureStatus.PUBLISHED,
+                tagId = tagId,
+                pageable = sortedPageable
+            )
+            .map { lecture ->
+                toListItemResponse(lecture)
+            }
+    }
+
+    @Transactional(readOnly = true)
+    fun getRecommendedLectures(
+        email: String,
+        pageable: Pageable
+    ): Page<LectureListItemResponse> {
+        val user = userRepository.findByEmail(email)
+            ?: throw IllegalArgumentException("사용자를 찾을 수 없습니다.")
+
+        val sortedPageable = createSortedPageable(pageable)
+
+        val tagIds = userInterestTagRepository
+            .findAllByUser_IdOrderByTag_NameAsc(user.id!!)
+            .map { interest -> interest.tag.id!! }
+
+        if (tagIds.isEmpty()) {
+            return Page.empty(sortedPageable)
+        }
+
+        return lectureRepository
+            .findPublishedByTagIds(
+                status = LectureStatus.PUBLISHED,
+                tagIds = tagIds,
+                pageable = sortedPageable
             )
             .map { lecture ->
                 toListItemResponse(lecture)

@@ -31,7 +31,7 @@ class TagService(
 
     @Transactional(readOnly = true)
     fun getTags(): List<TagResponse> {
-        return tagRepository.findAll()
+        return tagRepository.findAllByOrderByNameAsc()
             .map {
                 TagResponse(
                     id = it.id!!,

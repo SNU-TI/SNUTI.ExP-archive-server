@@ -32,6 +32,7 @@ class SecurityConfig(
             .authorizeHttpRequests {
                 it.requestMatchers("/auth/**").permitAll()
                 it.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                it.requestMatchers("/tags", "/tags/**").authenticated()
                 it.requestMatchers("/admin/**").hasRole("ADMIN")
                 it.requestMatchers("/lectures/**").authenticated()
                 it.requestMatchers("/articles/**").authenticated()

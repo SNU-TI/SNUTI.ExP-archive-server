@@ -18,6 +18,7 @@ import com.snuti.exparchiveserver.support.TestImageStorageConfig
 import com.snuti.exparchiveserver.user.entity.Role
 import com.snuti.exparchiveserver.user.entity.User
 import com.snuti.exparchiveserver.user.repository.UserRepository
+import com.snuti.exparchiveserver.user.repository.UserInterestTagRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -35,9 +36,12 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.http.HttpHeaders
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import tools.jackson.databind.ObjectMapper
 import java.time.LocalDateTime
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -53,6 +57,7 @@ constructor(
     private val articleRepository: ArticleRepository,
     private val videoRepository: VideoRepository,
     private val tagRepository: TagRepository,
+    private val userInterestTagRepository: UserInterestTagRepository,
     private val lectureTagRepository: LectureTagRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
@@ -66,6 +71,7 @@ constructor(
 
     @BeforeEach
     fun setup() {
+        userInterestTagRepository.deleteAll()
         lectureTagRepository.deleteAll()
         videoRepository.deleteAll()
         articleRepository.deleteAll()
@@ -491,5 +497,63 @@ constructor(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.content.length()").value(0))
+
+
     }
+
+    private fun updateInterestTags(
+        accessToken: String,
+        tagIds: List<Long>
+    ) = mvc.perform(
+        put("/users/me/interests")
+            .header("Authorization", "Bearer $accessToken")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(mapOf("tagIds" to tagIds)))
+    )
+    fun `관심 태그가 일치하는 공개 강좌를 중복 없이 추천한다`() {
+        val aiTag = tagRepository.findByName("AI")!!
+        val llmTag = tagRepository.findByName("LLM")!!
+
+        updateInterestTags(
+            accessToken = userToken,
+            tagIds = listOf(aiTag.id!!, llmTag.id!!)
+        )
+            .andExpect(status().isOk)
+
+        mvc.perform(
+            get("/users/me/interests")
+                .header("Authorization", "Bearer $userToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+
+        mvc.perform(
+            get("/lectures/recommended")
+                .header("Authorization", "Bearer $userToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].title").value("AI Seminar"))
+        @Test
+        fun `AI 태그로 공개 강좌를 조회한다`() {
+            val aiTag = tagRepository.findByName("AI")!!
+
+            mvc.perform(
+                get("/lectures")
+                    .header("Authorization", "Bearer $userToken")
+                    .param("tagId", aiTag.id!!.toString())
+            )
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("AI Seminar"))
+        }
+        private fun updateInterestTags(
+            accessToken: String,
+            tagIds: List<Long>
+        ) = mvc.perform(
+            put("/users/me/interests")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(mapOf("tagIds" to tagIds)))
+        )
 }
