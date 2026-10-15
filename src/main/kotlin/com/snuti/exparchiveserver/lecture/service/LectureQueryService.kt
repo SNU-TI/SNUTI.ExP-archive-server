@@ -9,6 +9,7 @@ import com.snuti.exparchiveserver.lecture.dto.VideoResponse
 import com.snuti.exparchiveserver.lecture.entity.Lecture
 import com.snuti.exparchiveserver.lecture.entity.LectureStatus
 import com.snuti.exparchiveserver.lecture.repository.LectureRepository
+import com.snuti.exparchiveserver.user.repository.UserFavoriteLectureRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
@@ -23,7 +24,8 @@ class LectureQueryService(
     private val lectureRepository: LectureRepository,
     private val imageStorageService: ImageStorageService,
     private val userRepository: UserRepository,
-    private val userInterestTagRepository: UserInterestTagRepository
+    private val userInterestTagRepository: UserInterestTagRepository,
+    private val userFavoriteLectureRepository: UserFavoriteLectureRepository
 ) {
 
     @Transactional(readOnly = true)
@@ -194,6 +196,26 @@ class LectureQueryService(
                     id = lectureTag.tag.id!!,
                     name = lectureTag.tag.name
                 )
+            }
+    }
+
+    @Transactional(readOnly = true)
+    fun getFavoriteLectures(
+        email: String,
+        pageable: Pageable
+    ): Page<LectureListItemResponse> {
+
+        val user = userRepository.findByEmail(email)
+            ?: throw IllegalArgumentException("사용자를 찾을 수 없습니다.")
+
+        return userFavoriteLectureRepository
+            .findByUserIdAndLectureStatusOrderByCreatedAtDesc(
+                userId = user.id!!,
+                status = LectureStatus.PUBLISHED,
+                pageable = pageable
+            )
+            .map { favorite ->
+                toListItemResponse(favorite.lecture)
             }
     }
 }
