@@ -18,6 +18,7 @@ import com.snuti.exparchiveserver.support.TestImageStorageConfig
 import com.snuti.exparchiveserver.user.entity.Role
 import com.snuti.exparchiveserver.user.entity.User
 import com.snuti.exparchiveserver.user.repository.UserRepository
+import com.snuti.exparchiveserver.user.repository.UserInterestTagRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -35,9 +36,12 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.http.HttpHeaders
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import tools.jackson.databind.ObjectMapper
 import java.time.LocalDateTime
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -53,6 +57,7 @@ constructor(
     private val articleRepository: ArticleRepository,
     private val videoRepository: VideoRepository,
     private val tagRepository: TagRepository,
+    private val userInterestTagRepository: UserInterestTagRepository,
     private val lectureTagRepository: LectureTagRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
@@ -66,6 +71,7 @@ constructor(
 
     @BeforeEach
     fun setup() {
+        userInterestTagRepository.deleteAll()
         lectureTagRepository.deleteAll()
         videoRepository.deleteAll()
         articleRepository.deleteAll()
