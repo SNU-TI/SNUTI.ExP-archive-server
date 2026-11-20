@@ -130,4 +130,13 @@ class LectureAdminController(
     ) {
         lectureAdminService.deleteLecture(id)
     }
+
+    @Operation(summary = "태그 삭제")
+    @DeleteMapping("/tags/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteTag(
+        @PathVariable id: Long
+    ) {
+        tagService.deleteTag(id)
+    }
 }

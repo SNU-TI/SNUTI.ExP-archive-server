@@ -538,4 +538,33 @@ constructor(
         assertTrue(lectureRepository.existsById(lectureId))
         assertTrue(articleRepository.existsById(articleId))
     }
+
+    @Test
+    fun `should delete tag as admin`() {
+        val tag = tagRepository.findByName("AI")!!
+        val tagId = tag.id!!
+
+        mvc.perform(
+            delete("/admin/tags/$tagId")
+                .header("Authorization", "Bearer $adminToken")
+        )
+            .andExpect(status().isNoContent)
+
+        assertFalse(tagRepository.existsById(tagId))
+        assertTrue(lectureRepository.existsById(lectureId))
+        assertEquals(1L, lectureTagRepository.count())
+    }
+
+    @Test
+    fun `should forbid normal user from deleting tag`() {
+        val tag = tagRepository.findByName("AI")!!
+
+        mvc.perform(
+            delete("/admin/tags/${tag.id}")
+                .header("Authorization", "Bearer $userToken")
+        )
+            .andExpect(status().isForbidden)
+
+        assertTrue(tagRepository.existsById(tag.id!!))
+    }
 }

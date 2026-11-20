@@ -10,4 +10,6 @@ interface UserInterestTagRepository : JpaRepository<UserInterestTag, Long> {
     ): List<UserInterestTag>
 
     fun deleteAllByUser_Id(userId: Long)
+
+    fun deleteAllByTag_Id(tagId: Long)
 }
