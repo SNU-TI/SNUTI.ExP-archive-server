@@ -246,4 +246,14 @@ class LectureAdminService(
                 )
             }
     }
+
+    @Transactional
+    fun deleteLecture(id: Long) {
+        val lecture = lectureRepository.findById(id)
+            .orElseThrow {
+                IllegalArgumentException("Lecture not found: $id")
+            }
+
+        lectureRepository.delete(lecture)
+    }
 }

@@ -42,6 +42,8 @@ import tools.jackson.databind.ObjectMapper
 import java.time.LocalDateTime
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -497,5 +499,43 @@ constructor(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.content.length()").value(0))
+    }
+
+    @Test
+    fun `should delete lecture and related data as admin`() {
+        // 삭제 전 데이터 존재 확인
+        assertTrue(lectureRepository.existsById(lectureId))
+        assertTrue(articleRepository.existsById(articleId))
+        assertEquals(2, lectureTagRepository.count())
+
+        // 관리자 권한으로 강좌 삭제
+        mvc.perform(
+            delete("/admin/lectures/$lectureId")
+                .header("Authorization", "Bearer $adminToken")
+        )
+            .andExpect(status().isNoContent)
+
+        // 강좌 및 연관 데이터 삭제 확인
+        assertFalse(lectureRepository.existsById(lectureId))
+        assertFalse(articleRepository.existsById(articleId))
+        assertEquals(0L, videoRepository.count())
+        assertEquals(0L, lectureTagRepository.count())
+
+        // 태그 자체는 삭제되지 않아야 함
+        assertTrue(tagRepository.existsByName("AI"))
+        assertTrue(tagRepository.existsByName("LLM"))
+    }
+
+    @Test
+    fun `should forbid normal user from deleting lecture`() {
+        mvc.perform(
+            delete("/admin/lectures/$lectureId")
+                .header("Authorization", "Bearer $userToken")
+        )
+            .andExpect(status().isForbidden)
+
+        // 권한이 없는 사용자의 요청으로 강좌가 삭제되지 않았는지 확인
+        assertTrue(lectureRepository.existsById(lectureId))
+        assertTrue(articleRepository.existsById(articleId))
     }
 }
